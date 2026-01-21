@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef, FC } from 'react'
+import { RefObject, useState, useEffect, useRef, FC } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useRouter } from 'next/navigation'
 import { ShieldCheck, Zap, ScanLine, ArrowRight, UploadCloud, Cpu, FileCheck, Twitter, Linkedin, Github, MessageSquare } from 'lucide-react'
+
 
 // --- HOOK POUR DÉTECTER QUAND UN ÉLÉMENT EST VISIBLE ---
 function useInView(ref: React.RefObject<HTMLElement>) {
@@ -82,7 +83,8 @@ function WowFactorVisual() {
 const AnimatedCounter = ({ value }: { value: number }) => {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref);
+  const isInView = useInView(ref as RefObject<HTMLElement>);
+
 
   useEffect(() => {
     if (!isInView) return;
@@ -106,7 +108,8 @@ const AnimatedCounter = ({ value }: { value: number }) => {
 
 const LiveStats = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref);
+  const isInView = useInView(ref as RefObject<HTMLElement>);
+  
   return (
     <section ref={ref} className="py-24 bg-white">
       <div className={`container mx-auto px-6 transition-opacity duration-1000 ${isInView ? 'opacity-100' : 'opacity-0'}`}>
@@ -132,7 +135,7 @@ const LiveStats = () => {
 // --- PRÉSENTATION DES SERVICES (COMMENT ÇA MARCHE) ---
 const ServicesShowcase = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref);
+  const isInView = useInView(ref as RefObject<HTMLElement>);
   return (
     <section ref={ref} className="py-24 bg-slate-50 border-t border-slate-200">
       <div className={`container mx-auto px-6 text-center transition-all duration-1000 ${isInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
@@ -157,7 +160,7 @@ const ServicesShowcase = () => {
 const InteractiveDemo = () => {
   const [step, setStep] = useState<'idle' | 'processing' | 'done'>('idle');
   const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref);
+  const isInView = useInView(ref as RefObject<HTMLElement>);
   
   const handleDemo = () => {
     setStep('processing');
@@ -264,7 +267,7 @@ const CTASection = () => {
         <Button 
           size="lg"
           className="mt-8 bg-blue-600 text-white hover:bg-blue-700 px-10 py-7 text-lg font-semibold rounded-lg shadow-lg shadow-blue-500/20"
-          onClick={() => router.push('/verify')}
+          onClick={() => router.push('/verification')}
         >
           Commencer la vérification
           <ArrowRight className="w-5 h-5 ml-2" />

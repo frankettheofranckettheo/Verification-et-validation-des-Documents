@@ -1,11 +1,16 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
-  images: {
-    domains: ['localhost'],
-  },
-}
+import type { NextConfig } from 'next';
 
-module.exports = nextConfig
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**', // ou spécifiez vos domaines exacts
+      },
+    ],
+  },
+  // Supprimez la section experimental avec appDir
+  // appDir est maintenant activé par défaut dans Next.js 13+
+};
+
+export default nextConfig;

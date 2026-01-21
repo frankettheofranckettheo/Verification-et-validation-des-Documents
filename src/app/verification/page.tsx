@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, ElementType } from 'react';
 import { VerificationFlow } from '@/components/verification/VerificationFlow';
 import { UploadCloud, ScanLine } from 'lucide-react';
 import { motion } from 'framer-motion';
+
 
 // --- TYPE DE LA MÉTHODE DE VÉRIFICATION ---
 export type VerificationMethod = 'scan' | 'upload' | null;
@@ -49,8 +50,16 @@ export default function VerificationPage() {
   );
 }
 
+// 1. Définir la structure des props
+interface MethodCardProps {
+  icon: ElementType; // "ElementType" permet de passer un composant (ex: LucideIcon)
+  title: string;
+  description: string;
+  onClick: () => void; // Ou une fonction qui ne retourne rien
+}
+
 // --- CARTE DE SÉLECTION DE MÉTHODE ---
-const MethodCard = ({ icon: Icon, title, description, onClick }) => (
+const MethodCard = ({ icon: Icon, title, description, onClick }: MethodCardProps) => (
   <motion.div
     whileHover={{ scale: 1.03 }}
     transition={{ type: "spring", stiffness: 300 }}

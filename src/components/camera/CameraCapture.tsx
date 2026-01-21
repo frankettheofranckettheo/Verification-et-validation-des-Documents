@@ -23,7 +23,15 @@ export function CameraCapture({ onCapture, onClose, documentSide }: CameraCaptur
     async function getCameraStream() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } // Préfère la caméra arrière
+          video: { 
+            // On demande la Full HD si possible
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            // On tente de forcer le focus continu (ne marche que sur certaines caméras modernes)
+            // @ts-ignore (car focusMode n'est pas encore standard partout)
+            advanced: [{ focusMode: "continuous" }],
+            facingMode: 'environment' 
+          } // Préfère la caméra arrière
         });
         setStream(stream);
         if (videoRef.current) {

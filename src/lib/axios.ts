@@ -4,7 +4,7 @@ import axios from 'axios';
 // Création de l'instance unique
 const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL, // Lit depuis .env.local
-  timeout: 30000, // 30 secondes max (l'OCR peut être long)
+  timeout: 300000, // 300 secondes max (l'OCR peut être long)
   headers: {
     'Content-Type': 'application/json',
   },

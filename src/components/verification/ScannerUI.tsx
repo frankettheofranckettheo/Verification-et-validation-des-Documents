@@ -26,7 +26,7 @@ export function ScannerUI({ rectoImage, versoImage, onCaptureRecto, onCaptureVer
     <ArrowLeft className="w-4 h-4 mr-2" />
     Changer de méthode
     </Button>
-    code Code
+
 
         
     <div className="text-center">

@@ -1,103 +1,57 @@
-// 'use client'
-
-// import { useState, useCallback } from 'react';
-// import { useDropzone } from 'react-dropzone';
-// import { UploadCloud, File, X, ArrowLeft } from 'lucide-react';
-// import { Button } from '@/components/ui/button';
-// import { motion } from 'framer-motion';
-
-// export function FileUploader({ onFileUpload, onBack }: { onFileUpload: (file: File) => void, onBack: () => void }) {
-//   const [file, setFile] = useState<File | null>(null);
-//   const [progress, setProgress] = useState(0);
-
-//   const onDrop = useCallback((acceptedFiles: File[]) => {
-//     if (acceptedFiles.length > 0) {
-//       const currentFile = acceptedFiles[0];
-//       setFile(currentFile);
-//       // Simuler l'upload
-//       const interval = setInterval(() => {
-//         setProgress(prev => {
-//           if (prev >= 100) {
-//             clearInterval(interval);
-//             setTimeout(() => onFileUpload(currentFile), 500);
-//             return 100;
-//           }
-//           return prev + 10;
-//         });
-//       }, 100);
-//     }
-//   }, [onFileUpload]);
-
-//   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-//     onDrop,
-//     accept: { 'image/*': ['.jpeg', '.png'], 'application/pdf': ['.pdf'] },
-//     maxFiles: 1
-//   });
-
-//   return (
-//     <motion.div 
-//       initial={{ opacity: 0, scale: 0.95 }}
-//       animate={{ opacity: 1, scale: 1 }}
-//       exit={{ opacity: 0, scale: 0.95 }}
-//       transition={{ duration: 0.3 }}
-//       className="bg-white p-8 rounded-xl border border-slate-200 shadow-lg w-full"
-//     >
-//       <Button variant="ghost" size="sm" onClick={onBack} className="mb-4">
-//         <ArrowLeft className="w-4 h-4 mr-2" />
-//         Changer de méthode
-//       </Button>
-
-//       <div
-//         {...getRootProps()}
-//         className={`p-10 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors
-//         ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-slate-50'}`}
-//       >
-//         <input {...getInputProps()} />
-//         <UploadCloud className="w-12 h-12 mx-auto text-slate-400" />
-//         <p className="mt-4 font-semibold text-slate-900">
-//           Glissez-déposez votre fichier ici
-//         </p>
-//         <p className="text-slate-500 text-sm">ou cliquez pour sélectionner (PDF, JPG, PNG)</p>
-//       </div>
-
-//       {file && (
-//         <div className="mt-6">
-//           <div className="flex items-center bg-slate-100 p-3 rounded-lg">
-//             <File className="w-8 h-8 text-blue-500" />
-//             <div className="ml-3 flex-1">
-//               <p className="text-sm font-medium text-slate-900">{file.name}</p>
-//               <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
-//             </div>
-//             <p className="text-sm font-semibold">{progress}%</p>
-//           </div>
-//           <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
-//             <div
-//               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-//               style={{ width: `${progress}%` }}
-//             ></div>
-//           </div>
-//         </div>
-//       )}
-//     </motion.div>
-//   );
-// }
-
-
-
-
-
-
-
-
-
-
 'use client'
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud, File as FileIcon, X, ArrowLeft, CheckCircle, Trash2 } from 'lucide-react';
+import { UploadCloud, ArrowLeft, Trash2, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
+
+// --- CORRECTION CRITIQUE ---
+// 1. NE PAS IMPORTER pdfjs-dist ICI !
+// import * as pdfjsLib from 'pdfjs-dist';  <-- À SUPPRIMER
+
+// --- Fonction utilitaire pour convertir la page 1 du PDF en image ---
+const renderPdfToImage = async (file: File): Promise<string> => {
+  
+  // 2. IMPORT DYNAMIQUE : On charge la librairie UNIQUEMENT ici, côté client
+  const pdfjsLib = await import('pdfjs-dist');
+
+  // Configuration du Worker (local)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+
+  const arrayBuffer = await file.arrayBuffer();
+  
+  // Charger le document PDF
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  
+  // Récupérer la première page
+  const page = await pdf.getPage(1);
+  
+  // Définir l'échelle (1.5 pour une bonne qualité de thumbnail)
+  const viewport = page.getViewport({ scale: 1.5 });
+  
+  // Créer un canvas en mémoire
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  
+  if (!context) throw new Error("Impossible de créer le contexte canvas");
+
+  canvas.height = viewport.height;
+  canvas.width = viewport.width;
+
+  // Dessiner la page PDF sur le canvas
+  await page.render({
+    canvasContext: context,
+    canvas: canvas,
+    viewport: viewport
+  }).promise;
+
+  // Convertir le canvas en URL d'image (Base64)
+  return canvas.toDataURL('image/jpeg');
+};
+
+// ... LE RESTE DU FICHIER RESTE EXACTEMENT LE MÊME ...
+// (SingleDropZone et FileUploader ne changent pas, sauf si vous aviez des imports PDFJS dedans)
 
 // --- Composant interne pour une zone de dépôt unique ---
 function SingleDropZone({ 
@@ -111,6 +65,42 @@ function SingleDropZone({
   onDrop: (file: File) => void; 
   onRemove: () => void; 
 }) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // Générer l'URL de prévisualisation (Image ou PDF)
+  useEffect(() => {
+    if (!file) {
+      setPreview(null);
+      setIsLoadingPreview(false);
+      return;
+    }
+
+    const generatePreview = async () => {
+      // 1. Si c'est une IMAGE
+      if (file.type.startsWith('image/')) {
+        const objectUrl = URL.createObjectURL(file);
+        setPreview(objectUrl);
+        return () => URL.revokeObjectURL(objectUrl);
+      }
+      
+      // 2. Si c'est un PDF
+      if (file.type === 'application/pdf') {
+        try {
+          setIsLoadingPreview(true);
+          const pdfImage = await renderPdfToImage(file);
+          setPreview(pdfImage);
+        } catch (error) {
+          console.error("Erreur prévisualisation PDF:", error);
+        } finally {
+          setIsLoadingPreview(false);
+        }
+      }
+    };
+
+    generatePreview();
+  }, [file]);
+
   const onDropCallback = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       onDrop(acceptedFiles[0]);
@@ -119,10 +109,15 @@ function SingleDropZone({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: onDropCallback,
-    accept: { 'image/*': ['.jpeg', '.jpg', '.png'] }, // On limite aux images pour l'instant
+    accept: { 
+      'image/*': ['.jpeg', '.jpg', '.png'],
+      'application/pdf': ['.pdf'] 
+    },
     maxFiles: 1,
-    disabled: !!file // Désactive le drop si un fichier est déjà là
+    disabled: !!file 
   });
+
+  const isPdf = file?.type === 'application/pdf';
 
   return (
     <div className="flex-1 w-full">
@@ -131,30 +126,48 @@ function SingleDropZone({
       {!file ? (
         <div
           {...getRootProps()}
-          className={`h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors p-4 text-center
+          className={`h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-colors p-4 text-center relative
           ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'}`}
         >
           <input {...getInputProps()} />
           <UploadCloud className={`w-10 h-10 mb-3 ${isDragActive ? 'text-blue-500' : 'text-slate-400'}`} />
-          <p className="text-sm font-medium text-slate-900">Cliquez ou glissez</p>
-          <p className="text-xs text-slate-500 mt-1">JPG, PNG</p>
+          <p className="text-sm font-medium text-slate-900">Cliquez, glissez ou Collez (Ctrl+V)</p>
+          <p className="text-xs text-slate-500 mt-1">JPG, PNG, PDF</p>
         </div>
       ) : (
-        <div className="h-48 border border-slate-200 rounded-lg bg-white p-4 relative flex flex-col items-center justify-center shadow-sm">
+        <div className="h-48 border border-slate-200 rounded-lg bg-slate-50 relative flex flex-col items-center justify-center shadow-sm overflow-hidden group">
           <button 
             onClick={onRemove}
-            className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+            className="absolute top-2 right-2 z-10 p-1.5 bg-white/80 backdrop-blur-sm text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors shadow-sm border border-slate-200"
+            title="Supprimer le fichier"
           >
-            <Trash2 className="w-5 h-5" />
+            <Trash2 className="w-4 h-4" />
           </button>
           
-          <div className="bg-green-100 p-3 rounded-full mb-3">
-            <FileIcon className="w-8 h-8 text-green-600" />
-          </div>
-          <p className="text-sm font-medium text-slate-900 truncate max-w-[90%]">{file.name}</p>
-          <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
-          <div className="flex items-center text-green-600 mt-2 text-xs font-bold">
-            <CheckCircle className="w-3 h-3 mr-1" /> Prêt
+          {isLoadingPreview ? (
+             <div className="flex flex-col items-center text-slate-400">
+                <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                <span className="text-xs">Chargement aperçu...</span>
+             </div>
+          ) : preview ? (
+            <img 
+              src={preview} 
+              alt="Prévisualisation" 
+              className="w-full h-full object-contain p-2 bg-white" 
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center text-slate-700 p-4">
+              <div className="bg-red-100 p-4 rounded-xl mb-3">
+                <FileText className="w-10 h-10 text-red-500" />
+              </div>
+              <p className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded mb-1">
+                {isPdf ? "PDF" : "FICHIER"}
+              </p>
+            </div>
+          )}
+          
+          <div className="absolute bottom-0 left-0 right-0 bg-slate-900/70 text-white text-xs p-2 text-center truncate backdrop-blur-sm z-10">
+            <span className="truncate px-2">{file.name}</span>
           </div>
         </div>
       )}
@@ -162,7 +175,7 @@ function SingleDropZone({
   );
 }
 
-// --- Composant Principal ---
+// --- Composant Principal (FileUploader) ---
 export function FileUploader({ 
   onUploadComplete, 
   onBack 
@@ -172,6 +185,29 @@ export function FileUploader({
 }) {
   const [rectoFile, setRectoFile] = useState<File | null>(null);
   const [versoFile, setVersoFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (rectoFile && versoFile) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') {
+          const file = items[i].getAsFile();
+          if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
+            if (!rectoFile) setRectoFile(file);
+            else if (!versoFile) setVersoFile(file);
+            break; 
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [rectoFile, versoFile]);
 
   const handleValidate = () => {
     if (rectoFile && versoFile) {
@@ -196,10 +232,9 @@ export function FileUploader({
       </div>
 
       <p className="text-slate-500 mb-6 text-center">
-        Veuillez importer le recto et le verso de votre document.
+        Importez ou collez (Ctrl+V) le recto et le verso de votre document.
       </p>
 
-      {/* Grille pour les deux zones */}
       <div className="flex flex-col md:flex-row gap-6 mb-8">
         <SingleDropZone 
           label="1. Recto du document" 
@@ -220,8 +255,10 @@ export function FileUploader({
           size="lg" 
           onClick={handleValidate} 
           disabled={!rectoFile || !versoFile}
-          className={`w-full md:w-auto px-12 ${
-            rectoFile && versoFile ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300'
+          className={`w-full md:w-auto px-12 transition-all ${
+            rectoFile && versoFile 
+            ? 'bg-blue-600 hover:bg-blue-700 shadow-md transform hover:scale-105' 
+            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
           }`}
         >
           {rectoFile && versoFile ? "Lancer l'analyse" : "Importez les 2 faces"}
